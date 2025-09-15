@@ -6,6 +6,8 @@ from PIL import Image, ImageOps
 import numpy as np
 import qrcode
 from io import BytesIO
+import time
+
 
 # ---------------------------
 # App config
@@ -130,55 +132,78 @@ if st.session_state.step == 'login':
         reset_all()
 
 # ---------------------------
-# Step: APP LOCK (PIN + Simulated fingerprint)
+# ---------------------------
+# Step: APP LOCK (PIN + nicer simulated fingerprint)
 # ---------------------------
 elif st.session_state.step == 'applock':
     st.subheader('App Lock (PIN or Fingerprint)')
-    st.write('Set a 4-digit PIN or press the fingerprint button (simulated). For demo the fingerprint always unlocks.')
+    st.write('Set a 4-digit PIN or use the fingerprint scanner (simulated). For demo the fingerprint will always unlock.')
 
-    col_a, col_b = st.columns([2,1])
-    with col_a:
+    # layout: left = instructions + pin, right = fingerprint UI
+    left, right = st.columns([2,1])
+
+    with left:
         pin = st.text_input('Enter 4-digit PIN (optional)', type='password', max_chars=4, key='pin_input')
-    with col_b:
-        if st.button("🔒 Use Fingerprint (Simulated)"):
-            # simulated biometric success - always unlock
+        row_a, row_b = st.columns([1,1])
+        if row_a.button('Set PIN & Continue'):
+            if not pin or len(pin) < 4:
+                st.warning('Choose a 4-digit PIN or use the fingerprint scanner.')
+            else:
+                st.session_state.pin = pin
+                st.session_state.step = 'scan_barcode'
+        if row_b.button('Back to Login'):
+            st.session_state.step = 'login'
+
+        st.markdown("---")
+        st.write("**Fingerprint demo** — for judges: place any finger (or use camera) to simulate biometric unlock.")
+        st.write("Use the *Place Finger* button for a fast demo, or use *Camera Scan* to show a live camera capture before unlocking.")
+
+    with right:
+        # fingerprint SVG (visual)
+        fp_html = """
+        <div style="display:flex;align-items:center;justify-content:center;">
+          <svg width="140" height="140" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C8.134 2 6 4.134 6 8v1" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 8c0-3.866-2.134-6-6-6S6 4.134 6 8v3c0 4.418-1 6 6 6s6-1.582 6-6V8z" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 14v4" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        """
+        st.components.v1.html(fp_html, height=160)
+
+        # Camera scan: capture finger image (optional show)
+        camera_capture = st.camera_input("Camera Scan (optional) — capture finger image")
+        # Place Finger button (simulates biometric scan)
+        if st.button("Place Finger (Simulated Biometric)"):
+            placeholder = st.empty()
+            prog = placeholder.progress(0)
+            # quick animated progress for realism
+            for i in range(1, 101, 10):
+                prog.progress(i)
+                time.sleep(0.08)
+            placeholder.success("Fingerprint accepted (demo)")
+            # small pause so user sees success
+            time.sleep(0.45)
+            # set session flag and advance
             st.session_state.pin = 'biometric-demo'
             st.session_state.step = 'scan_barcode'
 
-    col1, col2 = st.columns([1,1])
-    if col1.button('Set PIN & Continue'):
-        if not pin or len(pin) < 4:
-            st.warning('Choose a 4-digit PIN or use the fingerprint button')
-        else:
-            st.session_state.pin = pin
+        # If user used camera capture, treat as scan and simulate fingerprint
+        if camera_capture is not None:
+            # show preview
+            st.image(camera_capture.getvalue(), caption="Captured input (demo)", use_container_width=True)
+            # automatically simulate scan (small progress)
+            placeholder2 = st.empty()
+            prog2 = placeholder2.progress(0)
+            for i in range(1, 101, 20):
+                prog2.progress(i)
+                time.sleep(0.08)
+            placeholder2.success("Camera fingerprint accepted (demo)")
+            time.sleep(0.45)
+            st.session_state.pin = 'biometric-demo'
             st.session_state.step = 'scan_barcode'
-    if col2.button('Back to Login'):
-        st.session_state.step = 'login'
 
-# ---------------------------
-# Step: SCAN BARCODE (camera-driven, auto-advance)
-# ---------------------------
-elif st.session_state.step == 'scan_barcode':
-    st.subheader('Step 1 — Scan Barcode (College ID)')
-    st.write('Point the camera at the college ID. Press Capture — any captured frame will be accepted and auto-advance.')
 
-    cam = st.camera_input("Camera — point at barcode and Capture (any capture accepted)")
-    # auto-advance on first valid capture
-    if cam is not None:
-        try:
-            _ = cam.getvalue()
-            # store a demo barcode token (you can replace with decoded value later)
-            st.session_state.barcode = secrets.token_urlsafe(6)
-            # if session already present (via URL/teacher QR), go straight to face-match
-            if st.session_state.get('current_session'):
-                st.session_state.step = 'face_match'
-            else:
-                st.session_state.step = 'scan_qr'
-        except Exception:
-            st.error("Capture failed — try again.")
-
-    if st.button("Back"):
-        st.session_state.step = 'applock'
 
 # ---------------------------
 # Step: SCAN QR (camera-driven, auto-advance)
