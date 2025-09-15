@@ -1,4 +1,4 @@
-# streamlit_app.py (updated)
+# streamlit_app.py (cleaned - no demo instructions/messages)
 import streamlit as st
 from datetime import datetime, timedelta
 import io
@@ -7,7 +7,6 @@ import numpy as np
 import secrets
 import qrcode
 from io import BytesIO
-from urllib.parse import urlencode
 
 # ---------------------------
 # Config / initial session
@@ -49,13 +48,11 @@ def reset_all():
 # ---------------------------
 st.sidebar.title("Teacher / Admin")
 
-# simple checkbox to reveal teacher controls (you can later protect with a password)
+# simple checkbox to reveal teacher controls
 show_admin = st.sidebar.checkbox("Show teacher panel")
 
-# Admin controls
 if show_admin:
     st.sidebar.markdown("#### Session controls")
-    # create a new session token (valid for N minutes)
     session_valid_minutes = st.sidebar.number_input("Session valid (minutes)", min_value=5, max_value=240, value=60)
     if st.sidebar.button("Create new session"):
         token = secrets.token_urlsafe(6)
@@ -72,12 +69,10 @@ if show_admin:
         st.sidebar.code(token)
         if expires:
             st.sidebar.write("Expires:", expires.strftime("%Y-%m-%d %H:%M:%S"))
-        # Build URL for students to scan. Use deployed app base (update to your deployed URL)
         base = st.sidebar.text_input("App base URL (for QR)", value="https://share.streamlit.io/<your-username>/<repo>/main/streamlit_app.py")
         student_url = f"{base}?session={token}"
         st.sidebar.write("Student URL (scan this QR):")
         st.sidebar.code(student_url)
-        # render QR image
         qr = qrcode.make(student_url)
         buf = BytesIO()
         qr.save(buf, format="PNG")
@@ -163,7 +158,6 @@ elif st.session_state.step == 'scan_barcode':
             st.warning('Enter barcode string to simulate scanning')
         else:
             st.session_state.barcode = barcode
-            # if a session token is already present (via URL), skip scan_qr
             if st.session_state.get('current_session'):
                 st.session_state.step = 'face_match'
             else:
@@ -174,11 +168,9 @@ elif st.session_state.step == 'scan_barcode':
 elif st.session_state.step == 'scan_qr':
     st.subheader('Step 2 — Scan QR shown by teacher')
     st.write('If you opened the app by scanning the teacher QR, this step is skipped automatically.')
-    # show current session if present
     current_session = st.session_state.get('current_session')
     if current_session:
         st.success(f"Joined session: {current_session}")
-        # allow immediate continue
         if st.button("Continue to face-match"):
             st.session_state.step = 'face_match'
     else:
@@ -247,16 +239,9 @@ elif st.session_state.step == 'face_match':
         if ref_exists:
             st.image(ref_bytes, caption="Reference photo", use_container_width=True)
         else:
-            st.info("No reference photo found for this student in images/.")
-            st.write("To try the full demo (no student photos needed), add a demo image to the repository at `images/_demo_student.jpg` and redeploy.")
-            st.write("Quick GitHub upload steps:")
-            st.write("1. In your repo → Add file → Upload files.")
-            st.write("2. Choose the image file and upload it with the filename `images/_demo_student.jpg`.")
-            st.write("3. Commit changes. Streamlit Cloud will redeploy and Demo Match will work.")
+            # intentionally quiet: no instructional messages shown here
             if demo_ref_bytes:
                 st.image(demo_ref_bytes, caption="Demo reference (used by Demo Match)", use_container_width=True)
-            else:
-                st.write("(No demo image present in the repo yet)")
 
     st.write("---")
 
@@ -290,13 +275,13 @@ elif st.session_state.step == 'face_match':
                     else:
                         st.error(f"Face did not match (MSE={mse:.5f}) — attendance denied.")
             else:
-                st.warning("No student reference photo found. Use 'Demo Match' to show the flow.")
+                # quiet when no reference; show captured image only
                 st.image(chosen_bytes, caption="Captured / Uploaded selfie", use_container_width=True)
 
     if st.button("Demo: Simulate Match (works without local reference)"):
         demo_source = demo_ref_bytes if demo_ref_bytes else ref_bytes
         if demo_source is None:
-            st.error("No demo reference image found. Add images/_demo_student.jpg to repo to enable Demo Match.")
+            st.error("No demo reference available.")
         else:
             chosen_bytes = None
             if 'chosen_image_file' in locals() and chosen_image_file is not None:
