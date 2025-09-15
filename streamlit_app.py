@@ -231,7 +231,7 @@ elif st.session_state.step == 'face_match':
             ref_exists = False
 
         try:
-            with open("images/_demo_student.jpg", "rb") as f:
+            with open("_demo_student.jpg", "rb") as f:
                 demo_ref_bytes = f.read()
         except Exception:
             demo_ref_bytes = None
