@@ -12,7 +12,7 @@ from io import BytesIO
 # ---------------------------
 st.set_page_config(page_title='Student Attendance Prototype', layout='centered')
 
-# read session token from URL
+# read session token from URL (new API)
 qp = st.query_params
 if 'session' in qp:
     val = qp['session']
@@ -84,7 +84,7 @@ if show_admin:
 # Top UI (steps)
 # ---------------------------
 st.title('Student Attendance — Streamlit Prototype')
-st.write('Fast demo: simulated app-lock + camera-based barcode/QR scanning (or use Fake Scan).')
+st.write('Demo mode — simulated biometric + camera-driven scanning that auto-advances.')
 
 cols = st.columns([1,3,1])
 with cols[1]:
@@ -98,7 +98,7 @@ with cols[1]:
             st.markdown(f"<div style='background:#eef2ff;color:#1f2937;padding:6px;border-radius:8px;margin-bottom:6px'>{label}</div>", unsafe_allow_html=True)
 
 # ---------------------------
-# Helper: image similarity (MSE)
+# Helper: small image-similarity (optional)
 # ---------------------------
 def image_mse_bytes(a_bytes, b_bytes, size=(160,160)):
     try:
@@ -111,10 +111,6 @@ def image_mse_bytes(a_bytes, b_bytes, size=(160,160)):
         return float(np.mean((arr_a - arr_b) ** 2))
     except Exception:
         return None
-
-# small helper to generate a fake scanned code string
-def mk_fake_code(prefix='SCN'):
-    return f"{prefix}-{secrets.token_urlsafe(4)}"
 
 # ---------------------------
 # Step: LOGIN
@@ -138,18 +134,17 @@ if st.session_state.step == 'login':
 # ---------------------------
 elif st.session_state.step == 'applock':
     st.subheader('App Lock (PIN or Fingerprint)')
-    st.write('You can set a 4-digit PIN OR use the fingerprint button below (simulated biometric). For demo the fingerprint always unlocks.')
+    st.write('Set a 4-digit PIN or press the fingerprint button (simulated). For demo the fingerprint always unlocks.')
 
     col_a, col_b = st.columns([2,1])
     with col_a:
         pin = st.text_input('Enter 4-digit PIN (optional)', type='password', max_chars=4, key='pin_input')
     with col_b:
-        # fingerprint button (simulated biometric) - always succeeds
-        if st.button("🔒 Use Fingerprint (Simulated)", key='fingerprint_btn'):
-            st.session_state.pin = 'biometric'
+        if st.button("🔒 Use Fingerprint (Simulated)"):
+            # simulated biometric success - always unlock
+            st.session_state.pin = 'biometric-demo'
             st.session_state.step = 'scan_barcode'
 
-    # if user enters a 4-digit pin and presses Set PIN
     col1, col2 = st.columns([1,1])
     if col1.button('Set PIN & Continue'):
         if not pin or len(pin) < 4:
@@ -161,77 +156,60 @@ elif st.session_state.step == 'applock':
         st.session_state.step = 'login'
 
 # ---------------------------
-# Step: SCAN BARCODE (camera-based or Fake)
+# Step: SCAN BARCODE (camera-driven, auto-advance)
 # ---------------------------
 elif st.session_state.step == 'scan_barcode':
     st.subheader('Step 1 — Scan Barcode (College ID)')
-    st.write('Point the camera at the college ID barcode and press Capture, OR tap Fake Scan to proceed quickly.')
+    st.write('Point the camera at the college ID. Press Capture — any captured frame will be accepted and auto-advance.')
 
-    # camera capture: any captured image is treated as a successful scan
-    cam = st.camera_input("Camera — point at barcode and Capture (any capture will be accepted)")
-    col1, col2 = st.columns([1,1])
-    if col1.button("Fake Scan (accept anything)"):
-        # generate a fake barcode string and continue
-        st.session_state.barcode = mk_fake_code('BAR')
-        # if session already exists skip QR step
-        if st.session_state.get('current_session'):
-            st.session_state.step = 'face_match'
-        else:
-            st.session_state.step = 'scan_qr'
-
+    cam = st.camera_input("Camera — point at barcode and Capture (any capture accepted)")
+    # auto-advance on first valid capture
     if cam is not None:
         try:
-            # we don't decode the barcode image — accept any non-empty capture
-            bytes_data = cam.getvalue()
-            # optionally you can compute a hash or any deterministic token:
-            st.session_state.barcode = mk_fake_code('BAR')
+            _ = cam.getvalue()
+            # store a demo barcode token (you can replace with decoded value later)
+            st.session_state.barcode = secrets.token_urlsafe(6)
+            # if session already present (via URL/teacher QR), go straight to face-match
             if st.session_state.get('current_session'):
                 st.session_state.step = 'face_match'
             else:
                 st.session_state.step = 'scan_qr'
         except Exception:
-            st.error("Could not read camera capture — try Fake Scan.")
+            st.error("Capture failed — try again.")
 
-    if col2.button("Back"):
+    if st.button("Back"):
         st.session_state.step = 'applock'
 
 # ---------------------------
-# Step: SCAN QR (camera-based or Fake)
+# Step: SCAN QR (camera-driven, auto-advance)
 # ---------------------------
 elif st.session_state.step == 'scan_qr':
     st.subheader('Step 2 — Scan Teacher QR (Session)')
-    st.write('Point the camera at the teacher\'s QR. Any capture or Fake QR will join the session automatically.')
+    st.write('Point the camera at the teacher QR. Press Capture — any captured frame will be accepted and auto-advance.')
 
-    cam_q = st.camera_input("Camera — point at teacher QR and Capture (accepted as successful)")
-    c1, c2 = st.columns([1,1])
-    if c1.button("Fake QR (accept anything)"):
-        # create fake session token if none exists
-        token = st.session_state.get('current_session') or secrets.token_urlsafe(6)
-        st.session_state.current_session = token
-        st.session_state.step = 'face_match'
-
+    cam_q = st.camera_input("Camera — point at teacher QR and Capture")
     if cam_q is not None:
         try:
             _ = cam_q.getvalue()
-            # accept anything and set a session token (teacher should normally generate)
+            # accept and set/keep session token
             token = st.session_state.get('current_session') or secrets.token_urlsafe(6)
             st.session_state.current_session = token
             st.session_state.step = 'face_match'
         except Exception:
-            st.error("Could not read camera capture — try Fake QR.")
+            st.error("Capture failed — try again.")
 
-    if c2.button("Back"):
+    if st.button("Back"):
         st.session_state.step = 'scan_barcode'
 
 # ---------------------------
-# Step: FACE MATCH (as before) — unchanged logic but works with prior fake scans
+# Step: FACE MATCH
 # ---------------------------
 elif st.session_state.step == 'face_match':
-    st.subheader('Step 3 — Face detection / match')
-    st.write('Take a selfie with camera or upload one. For demo you can use Demo Match or an uploaded/captured selfie. Any capture is accepted for the demo flow after matching logic.')
+    st.subheader('Step 3 — Face detection / match (demo)')
+    st.write('Take a selfie with camera or upload one. If a reference image exists (images/<college_id>.jpg) it will try a simple similarity check; otherwise demo accepts the selfie and grants attendance.')
 
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         cam_img = st.camera_input("Take a selfie")
         uploaded = st.file_uploader("Or upload a selfie (png/jpg)", type=['png','jpg','jpeg'])
         chosen = None
@@ -240,14 +218,14 @@ elif st.session_state.step == 'face_match':
         elif uploaded is not None:
             chosen = uploaded
 
-    with col2:
+    with c2:
         st.write('Student record:')
         if st.session_state.user:
             st.write(f"**{st.session_state.user['name']}**")
             st.write(f"ID: {st.session_state.user['college_id']}")
-        st.write(f"Barcode: {st.session_state.barcode}  |  Session: {st.session_state.get('current_session')}")
+        st.write(f"Barcode: {st.session_state.barcode}  |  Session: {st.session_state.get('current_session', '')}")
 
-    # try to load reference, but demo will accept captured image if no ref
+    # try load reference if present
     ref_bytes = None
     ref_exists = False
     try:
@@ -264,6 +242,7 @@ elif st.session_state.step == 'face_match':
     except Exception:
         ref_exists = False
 
+    # demo reference optionally used if present
     demo_ref_bytes = None
     try:
         with open("images/_demo_student.jpg", "rb") as f:
@@ -273,7 +252,6 @@ elif st.session_state.step == 'face_match':
 
     st.write("---")
 
-    # if any selfie captured, try to compare if reference exists; else accept demo behavior
     if chosen is not None:
         try:
             chosen_bytes = chosen.getvalue()
@@ -281,7 +259,7 @@ elif st.session_state.step == 'face_match':
             chosen_bytes = None
 
         if chosen_bytes is None:
-            st.error("Could not read the captured/uploaded image.")
+            st.error("Could not read captured/uploaded image.")
         else:
             if ref_exists and ref_bytes:
                 mse = image_mse_bytes(chosen_bytes, ref_bytes)
@@ -302,7 +280,7 @@ elif st.session_state.step == 'face_match':
                     else:
                         st.error(f"Face did not match (MSE={mse:.5f}) — attendance denied.")
             else:
-                # demo: accept any captured selfie as match (fast demo)
+                # demo: accept any captured selfie
                 st.success("Demo: selfie captured — attendance granted.")
                 st.session_state.attendance.insert(0, {
                     'name': st.session_state.user['name'],
@@ -313,22 +291,11 @@ elif st.session_state.step == 'face_match':
                 })
                 st.session_state.step = 'done'
 
-    # Demo button (also accepts without ref)
-    if st.button("Demo: Simulate Match (no reference needed)"):
-        st.session_state.attendance.insert(0, {
-            'name': st.session_state.user['name'],
-            'college_id': st.session_state.user['college_id'],
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'barcode': st.session_state.barcode,
-            'session': st.session_state.get('current_session')
-        })
-        st.session_state.step = 'done'
-
-    if st.button("Back to QR / Session"):
+    if st.button("Back"):
         st.session_state.step = 'scan_qr'
 
 # ---------------------------
-# Done
+# Done page
 # ---------------------------
 elif st.session_state.step == 'done':
     st.subheader('Attendance Recorded ✅')
