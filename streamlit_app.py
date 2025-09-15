@@ -133,13 +133,13 @@ if st.session_state.step == 'login':
 
 # ---------------------------
 # ---------------------------
-# Step: APP LOCK (PIN + nicer simulated fingerprint)
+# ---------------------------
+# Step: APP LOCK (PIN + polished simulated fingerprint, no camera)
 # ---------------------------
 elif st.session_state.step == 'applock':
     st.subheader('App Lock (PIN or Fingerprint)')
-    st.write('Set a 4-digit PIN or use the fingerprint scanner (simulated). For demo the fingerprint will always unlock.')
+    st.write('Set a 4-digit PIN or press the fingerprint scanner (simulated). For demo the fingerprint always unlocks.')
 
-    # layout: left = instructions + pin, right = fingerprint UI
     left, right = st.columns([2,1])
 
     with left:
@@ -155,53 +155,34 @@ elif st.session_state.step == 'applock':
             st.session_state.step = 'login'
 
         st.markdown("---")
-        st.write("**Fingerprint demo** — for judges: place any finger (or use camera) to simulate biometric unlock.")
-        st.write("Use the *Place Finger* button for a fast demo, or use *Camera Scan* to show a live camera capture before unlocking.")
+        st.write("**Fingerprint demo** — press Place Finger to simulate biometric unlock.")
 
     with right:
         # fingerprint SVG (visual)
         fp_html = """
         <div style="display:flex;align-items:center;justify-content:center;">
           <svg width="140" height="140" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C8.134 2 6 4.134 6 8v1" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M18 8c0-3.866-2.134-6-6-6S6 4.134 6 8v3c0 4.418-1 6 6 6s6-1.582 6-6V8z" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M12 14v4" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 2C8.134 2 6 4.134 6 8v1" stroke="#374151" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 8c0-3.866-2.134-6-6-6S6 4.134 6 8v3c0 4.418-1 6 6 6s6-1.582 6-6V8z" stroke="#374151" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 14v4" stroke="#374151" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         """
         st.components.v1.html(fp_html, height=160)
 
-        # Camera scan: capture finger image (optional show)
-        camera_capture = st.camera_input("Camera Scan (optional) — capture finger image")
-        # Place Finger button (simulates biometric scan)
-        if st.button("Place Finger (Simulated Biometric)"):
+        # Place Finger button (simulated biometric) with progress
+        if st.button("Place Finger (Simulated)"):
             placeholder = st.empty()
             prog = placeholder.progress(0)
-            # quick animated progress for realism
+            # short animated progress for realism
             for i in range(1, 101, 10):
                 prog.progress(i)
-                time.sleep(0.08)
+                time.sleep(0.06)
             placeholder.success("Fingerprint accepted (demo)")
-            # small pause so user sees success
-            time.sleep(0.45)
-            # set session flag and advance
+            time.sleep(0.35)
             st.session_state.pin = 'biometric-demo'
             st.session_state.step = 'scan_barcode'
 
-        # If user used camera capture, treat as scan and simulate fingerprint
-        if camera_capture is not None:
-            # show preview
-            st.image(camera_capture.getvalue(), caption="Captured input (demo)", use_container_width=True)
-            # automatically simulate scan (small progress)
-            placeholder2 = st.empty()
-            prog2 = placeholder2.progress(0)
-            for i in range(1, 101, 20):
-                prog2.progress(i)
-                time.sleep(0.08)
-            placeholder2.success("Camera fingerprint accepted (demo)")
-            time.sleep(0.45)
-            st.session_state.pin = 'biometric-demo'
-            st.session_state.step = 'scan_barcode'
 
 # ---------------------------
 # Step: SCAN BARCODE (camera-driven, auto-advance)
