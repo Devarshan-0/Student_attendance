@@ -1,4 +1,4 @@
-# streamlit_app.py
+# streamlit_app.py (updated)
 import streamlit as st
 from datetime import datetime, timedelta
 import io
@@ -15,9 +15,14 @@ from urllib.parse import urlencode
 st.set_page_config(page_title='Student Attendance Prototype', layout='centered')
 
 # read session token from URL if present and store in session_state
-qp = st.experimental_get_query_params()
+qp = st.query_params
 if 'session' in qp:
-    st.session_state.current_session = qp['session'][0]
+    # st.query_params returns lists for values; use first element
+    val = qp['session']
+    if isinstance(val, list) and len(val) > 0:
+        st.session_state.current_session = val[0]
+    else:
+        st.session_state.current_session = val
 
 if 'step' not in st.session_state:
     st.session_state.step = 'login'
@@ -68,8 +73,6 @@ if show_admin:
         if expires:
             st.sidebar.write("Expires:", expires.strftime("%Y-%m-%d %H:%M:%S"))
         # Build URL for students to scan. Use deployed app base (update to your deployed URL)
-        # If you're testing locally, students will need the deployed URL. Change base below after deploy.
-        # Replace the base URL with your Streamlit app URL after deployment.
         base = st.sidebar.text_input("App base URL (for QR)", value="https://share.streamlit.io/<your-username>/<repo>/main/streamlit_app.py")
         student_url = f"{base}?session={token}"
         st.sidebar.write("Student URL (scan this QR):")
@@ -79,7 +82,7 @@ if show_admin:
         buf = BytesIO()
         qr.save(buf, format="PNG")
         buf.seek(0)
-        st.sidebar.image(buf, caption="Scan to join session", use_column_width=True)
+        st.sidebar.image(buf, caption="Scan to join session", use_container_width=True)
 
         if st.sidebar.button("Expire current session"):
             st.session_state.current_session = None
@@ -242,11 +245,18 @@ elif st.session_state.step == 'face_match':
             demo_ref_bytes = None
 
         if ref_exists:
-            st.image(ref_bytes, caption="Reference photo", use_column_width=True)
+            st.image(ref_bytes, caption="Reference photo", use_container_width=True)
         else:
-            st.info("No reference photo found for this student in images/. Add images/<college_id>.jpg to enable realistic matching.")
+            st.info("No reference photo found for this student in images/.")
+            st.write("To try the full demo (no student photos needed), add a demo image to the repository at `images/_demo_student.jpg` and redeploy.")
+            st.write("Quick GitHub upload steps:")
+            st.write("1. In your repo → Add file → Upload files.")
+            st.write("2. Choose the image file and upload it with the filename `images/_demo_student.jpg`.")
+            st.write("3. Commit changes. Streamlit Cloud will redeploy and Demo Match will work.")
             if demo_ref_bytes:
-                st.image(demo_ref_bytes, caption="Demo reference (used by Demo Match)", use_column_width=True)
+                st.image(demo_ref_bytes, caption="Demo reference (used by Demo Match)", use_container_width=True)
+            else:
+                st.write("(No demo image present in the repo yet)")
 
     st.write("---")
 
@@ -281,7 +291,7 @@ elif st.session_state.step == 'face_match':
                         st.error(f"Face did not match (MSE={mse:.5f}) — attendance denied.")
             else:
                 st.warning("No student reference photo found. Use 'Demo Match' to show the flow.")
-                st.image(chosen_bytes, caption="Captured / Uploaded selfie", use_column_width=True)
+                st.image(chosen_bytes, caption="Captured / Uploaded selfie", use_container_width=True)
 
     if st.button("Demo: Simulate Match (works without local reference)"):
         demo_source = demo_ref_bytes if demo_ref_bytes else ref_bytes
