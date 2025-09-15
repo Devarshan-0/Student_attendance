@@ -203,7 +203,30 @@ elif st.session_state.step == 'applock':
             st.session_state.pin = 'biometric-demo'
             st.session_state.step = 'scan_barcode'
 
+# ---------------------------
+# Step: SCAN BARCODE (camera-driven, auto-advance)
+# ---------------------------
+elif st.session_state.step == 'scan_barcode':
+    st.subheader('Step 1 — Scan Barcode (College ID)')
+    st.write('Point the camera at the college ID. Press Capture — any captured frame will be accepted and auto-advance.')
 
+    cam = st.camera_input("Camera — point at barcode and Capture (any capture accepted)")
+    # auto-advance on first valid capture
+    if cam is not None:
+        try:
+            _ = cam.getvalue()
+            # store a demo barcode token (you can replace with decoded value later)
+            st.session_state.barcode = secrets.token_urlsafe(6)
+            # if session already present (via URL/teacher QR), go straight to face-match
+            if st.session_state.get('current_session'):
+                st.session_state.step = 'face_match'
+            else:
+                st.session_state.step = 'scan_qr'
+        except Exception:
+            st.error("Capture failed — try again.")
+
+    if st.button("Back"):
+        st.session_state.step = 'applock'
 
 # ---------------------------
 # Step: SCAN QR (camera-driven, auto-advance)
